@@ -151,10 +151,8 @@ class FoodCatalogueControllerTest {
 
     @Test
     void testAddFoodItem_WithNullInput() throws Exception {
-        // Given
-        when(foodCatalogueService.addFoodItem(any())).thenThrow(new IllegalArgumentException("Food item cannot be null"));
-
         // When & Then
+        // Spring automatically handles null JSON input and returns 400 Bad Request
         mockMvc.perform(post("/foodCatalogue/addFoodItem")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("null"))
