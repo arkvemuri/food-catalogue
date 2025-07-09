@@ -19,7 +19,7 @@ pipeline {
     
     tools {
         maven 'Maven'
-        jdk 'JDK-21'
+        jdk 'Java21'
     }
     
     stages {
