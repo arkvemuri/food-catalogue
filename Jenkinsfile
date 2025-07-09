@@ -3,7 +3,7 @@ pipeline {
     
     environment {
         // Docker Hub credentials (configure in Jenkins credentials)
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        DOCKERHUB_CREDENTIALS = credentials('DOCKER_HUB_CREDENTIAL')
         DOCKER_IMAGE = 'arkvemuri/food-catalogue'
         DOCKER_TAG = "${BUILD_NUMBER}"
         
@@ -97,31 +97,30 @@ pipeline {
             }
         }
         
-        stage('Build Docker Image') {
-            steps {
-                echo 'Building Docker image...'
-                script {
-                    // Build the Docker image
-                    def dockerImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                    
-                    // Also tag as latest
-                    dockerImage.tag("latest")
-                }
-            }
-        }
-        
-        stage('Push to Docker Hub') {
-            steps {
-                echo 'Pushing Docker image to Docker Hub...'
-                script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                        // Push both tagged and latest versions
-                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                        docker.image("${DOCKER_IMAGE}:latest").push()
-                    }
-                }
-            }
-        }
+        stage('Docker Build and Push') {
+              steps {
+                  bat 'echo %DOCKERHUB_CREDENTIALS_PSW% | docker login -u %DOCKERHUB_CREDENTIALS_USR% --password-stdin'
+                  bat 'docker build -t arkvemuri/restaurant-listing-service:%VERSION% .'
+                  bat 'docker push arkvemuri/restaurant-listing-service:%VERSION%'
+              }
+         }
+         stage('Update Image Tag in GitOps') {
+               steps {
+                  checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[ credentialsId: 'local-git-ssh', url: 'git@github.com:arkvemuri/deployment-folder.git']])
+                  script {
+                      bat '''
+                       powershell -Command "(Get-Content aws/restaurant-manifest.yml) -replace 'image:.*', 'image: arkvemuri/restaurant-listing-service:%VERSION%' | Set-Content aws/restaurant-manifest.yml"
+                     '''
+                       bat 'git checkout master'
+                       bat 'git add .'
+                       bat 'git commit -m "Update image tag"'
+                       sshagent(['local-git-ssh'])
+                       {
+                               bat('git push')
+                       }
+                  }
+               }
+             }
         
         stage('Clean Up') {
             steps {
